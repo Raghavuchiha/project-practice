@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Utilex — Cloud Storage Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── Reset & Base ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg        : #07080f;
+      --card      : #0f1019;
+      --border    : #1e2030;
+      --text      : #e2e4f0;
+      --muted     : #5a5d7a;
+      --accent    : #4f8ef7;
+      --hot       : #ff6b35;
+      --cold      : #4fb8f7;
+      --archive   : #9b8af7;
+      --real      : #3dd68c;
+      --ai        : #f76a8c;
+      --mono      : 'JetBrains Mono', monospace;
+      --sans      : 'Outfit', sans-serif;
+    }
+
+    body {
+      background  : var(--bg);
+      color       : var(--text);
+      font-family : var(--sans);
+      min-height  : 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      padding         : 24px 40px;
+      border-bottom   : 1px solid var(--border);
+      display         : flex;
+      align-items     : center;
+      justify-content : space-between;
+    }
+
+    .logo {
+      font-size   : 22px;
+      font-weight : 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .header-tag {
+      font-family : var(--mono);
+      font-size   : 11px;
+      color       : var(--muted);
+      background  : var(--card);
+      border      : 1px solid var(--border);
+      padding     : 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* ── Main Layout ── */
+    main { padding: 40px; max-width: 1200px; margin: 0 auto; }
+
+    /* ── Upload Section ── */
+    .upload-area {
+      border        : 2px dashed var(--border);
+      border-radius : 16px;
+      padding       : 50px;
+      text-align    : center;
+      cursor        : pointer;
+      transition    : all 0.3s;
+      margin-bottom : 40px;
+    }
+
+    .upload-area:hover,
+    .upload-area.dragover {
+      border-color : var(--accent);
+      background   : rgba(79, 142, 247, 0.04);
+    }
+
+    .upload-area h2 {
+      font-size   : 22px;
+      font-weight : 700;
+      margin-bottom: 8px;
+    }
+
+    .upload-area p {
+      color     : var(--muted);
+      font-size : 14px;
+    }
+
+    .upload-btn {
+      margin-top    : 20px;
+      display       : inline-block;
+      padding       : 12px 30px;
+      background    : var(--accent);
+      color         : white;
+      border-radius : 8px;
+      font-weight   : 700;
+      cursor        : pointer;
+      border        : none;
+      font-family   : var(--sans);
+      font-size     : 14px;
+      transition    : opacity 0.2s;
+    }
+
+    .upload-btn:hover { opacity: 0.85; }
+
+    #fileInput { display: none; }
+
+    /* ── Summary Bar ── */
+    .summary-bar {
+      display       : grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap           : 16px;
+      margin-bottom : 40px;
+    }
+
+    .summary-card {
+      background    : var(--card);
+      border        : 1px solid var(--border);
+      border-radius : 12px;
+      padding       : 20px;
+      text-align    : center;
+    }
+
+    .summary-card .count {
+      font-size   : 36px;
+      font-weight : 800;
+      font-family : var(--mono);
+    }
+
+    .summary-card .label {
+      font-size  : 12px;
+      color      : var(--muted);
+      margin-top : 4px;
+    }
+
+    .hot-count     { color: var(--hot); }
+    .cold-count    { color: var(--cold); }
+    .archive-count { color: var(--archive); }
+    .total-count   { color: var(--accent); }
+
+    /* ── Results Grid ── */
+    .results-grid {
+      display               : grid;
+      grid-template-columns : repeat(auto-fill, minmax(320px, 1fr));
+      gap                   : 20px;
+    }
+
+    /* ── Image Card ── */
+    .img-card {
+      background    : var(--card);
+      border        : 1px solid var(--border);
+      border-radius : 14px;
+      overflow      : hidden;
+      animation     : slideIn 0.4s ease forwards;
+      opacity       : 0;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tier border color on left */
+    .img-card.HOT     { border-left: 3px solid var(--hot); }
+    .img-card.COLD    { border-left: 3px solid var(--cold); }
+    .img-card.ARCHIVE { border-left: 3px solid var(--archive); }
+
+    /* ── Image Preview ── */
+    .img-preview {
+      width      : 100%;
+      height     : 180px;
+      object-fit : cover;
+      display    : block;
+    }
+
+    /* ── Card Body ── */
+    .card-body { padding: 16px; }
+
+    .card-filename {
+      font-family   : var(--mono);
+      font-size     : 12px;
+      color         : var(--muted);
+      margin-bottom : 12px;
+      white-space   : nowrap;
+      overflow      : hidden;
+      text-overflow : ellipsis;
+    }
+
+    /* ── Pipeline Steps ── */
+    .pipeline-step {
+      display       : flex;
+      align-items   : center;
+      justify-content: space-between;
+      padding       : 8px 0;
+      border-bottom : 1px solid var(--border);
+      font-size     : 13px;
+    }
+
+    .pipeline-step:last-child { border-bottom: none; }
+
+    .step-label {
+      color      : var(--muted);
+      font-size  : 12px;
+    }
+
+    .step-value {
+      font-family : var(--mono);
+      font-weight : 700;
+      font-size   : 13px;
+    }
+
+    .step-value.real    { color: var(--real); }
+    .step-value.ai      { color: var(--ai); }
+    .step-value.score   { color: var(--accent); }
+
+    /* ── Tier Badge ── */
+    .tier-badge {
+      display       : inline-block;
+      padding       : 5px 14px;
+      border-radius : 20px;
+      font-weight   : 700;
+      font-size     : 13px;
+      font-family   : var(--mono);
+      margin-top    : 12px;
+    }
+
+    .tier-badge.HOT     { background: rgba(255,107,53,0.15); color: var(--hot); }
+    .tier-badge.COLD    { background: rgba(79,184,247,0.15); color: var(--cold); }
+    .tier-badge.ARCHIVE { background: rgba(155,138,247,0.15); color: var(--archive); }
+
+    /* ── Processing state ── */
+    .processing {
+      display    : flex;
+      align-items: center;
+      gap        : 8px;
+      color      : var(--muted);
+      font-size  : 13px;
+      padding    : 20px 0;
+    }
+
+    .spinner {
+      width        : 16px;
+      height       : 16px;
+      border       : 2px solid var(--border);
+      border-top   : 2px solid var(--accent);
+      border-radius: 50%;
+      animation    : spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Metadata Expand ── */
+    .metadata-toggle {
+      font-size   : 11px;
+      color       : var(--muted);
+      cursor      : pointer;
+      margin-top  : 8px;
+      display     : inline-block;
+    }
+
+    .metadata-toggle:hover { color: var(--accent); }
+
+    .metadata-grid {
+      display               : grid;
+      grid-template-columns : 1fr 1fr;
+      gap                   : 6px;
+      margin-top            : 10px;
+      padding               : 10px;
+      background            : rgba(255,255,255,0.02);
+      border-radius         : 8px;
+      display               : none;
+    }
+
+    .metadata-grid.open { display: grid; }
+
+    .meta-item { font-size: 11px; }
+    .meta-item .mk { color: var(--muted); }
+    .meta-item .mv { font-family: var(--mono); color: var(--text); }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align : center;
+      color      : var(--muted);
+      padding    : 60px 0;
+      font-size  : 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo">Util<span>ex</span></div>
+    <div class="header-tag">Cloud Storage Tier Recommender</div>
+  </header>
+
+  <main>
+
+    <!-- Upload Area -->
+    <div class="upload-area" id="uploadArea">
+      <h2>Upload Images</h2>
+      <p>Drop multiple images here — system will analyze each one automatically</p>
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+        Select Images
+      </button>
+      <input type="file" id="fileInput" multiple accept="image/*" />
+    </div>
+
+    <!-- Summary Bar -->
+    <div class="summary-bar">
+      <div class="summary-card">
+        <div class="count total-count" id="totalCount">0</div>
+        <div class="label">Total Images</div>
+      </div>
+      <div class="summary-card">
+        <div class="count hot-count" id="hotCount">0</div>
+        <div class="label">HOT Tier</div>
+      </div>
+      <div class="summary-card">
+        <div class="count cold-count" id="coldCount">0</div>
+        <div class="label">COLD Tier</div>
+      </div>
+      <div class="summary-card">
+        <div class="count archive-count" id="archiveCount">0</div>
+        <div class="label">ARCHIVE Tier</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-grid" id="resultsGrid">
+      <div class="empty-state">Upload images to begin analysis</div>
+    </div>
+
+  </main>
+
+  <script>
+
+    // ── Counters ──────────────────────────────
+    let totalCount   = 0
+    let hotCount     = 0
+    let coldCount    = 0
+    let archiveCount = 0
+
+    // ── File Input ────────────────────────────
+    document.getElementById("fileInput").addEventListener("change", function(e) {
+      const files = Array.from(e.target.files)
+      if (files.length === 0) return
+
+      // Clear empty state on first upload
+      document.getElementById("resultsGrid").innerHTML = ""
+
+      // Send each image one by one
+      files.forEach(file => processImage(file))
+    })
+
+    // ── Drag and Drop ─────────────────────────
+    const uploadArea = document.getElementById("uploadArea")
+
+    uploadArea.addEventListener("dragover", function(e) {
+      e.preventDefault()
+      uploadArea.classList.add("dragover")
+    })
+
+    uploadArea.addEventListener("dragleave", function() {
+      uploadArea.classList.remove("dragover")
+    })
+
+    uploadArea.addEventListener("drop", function(e) {
+      e.preventDefault()
+      uploadArea.classList.remove("dragover")
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"))
+      document.getElementById("resultsGrid").innerHTML = ""
+      files.forEach(file => processImage(file))
+    })
+
+    // ── Process One Image ─────────────────────
+    function processImage(file) {
+
+      // Create a card immediately showing "processing"
+      const card = createProcessingCard(file)
+      document.getElementById("resultsGrid").appendChild(card)
+
+      // Read image for preview
+      const reader = new FileReader()
+      reader.onload = function(e) {
+        card.querySelector(".img-preview").src = e.target.result
+      }
+      reader.readAsDataURL(file)
+
+      // Send image to Flask backend
+      const formData = new FormData()
+      formData.append("image", file)
+
+      fetch("http://localhost:5000/analyze", {
+        method : "POST",
+        body   : formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        // Replace processing state with real results
+        fillCard(card, data)
+        updateCounters(data.tier)
+      })
+      .catch(err => {
+        card.querySelector(".card-body").innerHTML = `
+          <p style="color:#f76a8c; font-size:13px;">
+            Error connecting to server. Make sure app.py is running.
+          </p>`
+      })
+    }
+
+    // ── Create Card with Loading State ────────
+    function createProcessingCard(file) {
+      const card = document.createElement("div")
+      card.className = "img-card"
+      card.innerHTML = `
+        <img class="img-preview" src="" alt="${file.name}" />
+        <div class="card-body">
+          <div class="card-filename">${file.name}</div>
+          <div class="processing">
+            <div class="spinner"></div>
+            Analyzing image...
+          </div>
+        </div>
+      `
+      return card
+    }
+
+    // ── Fill Card with Results ─────────────────
+    function fillCard(card, data) {
+
+      // Add tier class for border color
+      card.classList.add(data.tier)
+
+      const aiClass   = data.ai_label === "Real" ? "real" : "ai"
+      const tierEmoji = data.tier === "HOT" ? "🔥" : data.tier === "COLD" ? "❄️" : "📦"
+
+      card.querySelector(".card-body").innerHTML = `
+        <div class="card-filename">${data.filename}</div>
+
+        <!-- Pipeline Steps -->
+        <div class="pipeline-step">
+          <span class="step-label">AI Detection</span>
+          <span class="step-value ${aiClass}">${data.ai_label} (${data.ai_score})</span>
+        </div>
+
+        <div class="pipeline-step">
+          <span class="step-label">Recency Score</span>
+          <span class="step-value score">${data.recency_score} / 100</span>
+        </div>
+
+        <div class="pipeline-step">
+          <span class="step-label">Utility Score</span>
+          <span class="step-value score">${data.utility_score}</span>
+        </div>
+
+        <!-- Tier Badge -->
+        <div>
+          <span class="tier-badge ${data.tier}">${tierEmoji} ${data.tier}</span>
+        </div>
+
+        <!-- Metadata toggle -->
+        <div class="metadata-toggle" onclick="toggleMeta(this)">▶ Show Metadata</div>
+        <div class="metadata-grid">
+          <div class="meta-item"><div class="mk">Days Since Access</div><div class="mv">${data.metadata.days_since_access}</div></div>
+          <div class="meta-item"><div class="mk">Access Frequency</div><div class="mv">${data.metadata.access_frequency}</div></div>
+          <div class="meta-item"><div class="mk">Revisit Rate</div><div class="mv">${data.metadata.revisit_rate}</div></div>
+          <div class="meta-item"><div class="mk">Decay Rate</div><div class="mv">${data.metadata.access_decay_rate}%/wk</div></div>
+          <div class="meta-item"><div class="mk">Access Velocity</div><div class="mv">${data.metadata.access_velocity}</div></div>
+        </div>
+      `
+    }
+
+    // ── Toggle Metadata ────────────────────────
+    function toggleMeta(el) {
+      const grid = el.nextElementSibling
+      grid.classList.toggle("open")
+      el.textContent = grid.classList.contains("open") ? "▼ Hide Metadata" : "▶ Show Metadata"
+    }
+
+    // ── Update Summary Counters ────────────────
+    function updateCounters(tier) {
+      totalCount++
+      if (tier === "HOT")     hotCount++
+      if (tier === "COLD")    coldCount++
+      if (tier === "ARCHIVE") archiveCount++
+
+      document.getElementById("totalCount").textContent   = totalCount
+      document.getElementById("hotCount").textContent     = hotCount
+      document.getElementById("coldCount").textContent    = coldCount
+      document.getElementById("archiveCount").textContent = archiveCount
+    }
+
+  </script>
+</body>
+</html>
